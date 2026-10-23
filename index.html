@@ -240,10 +240,13 @@ $("modeIn").onclick=()=>setMode("in");$("modeOut").onclick=()=>setMode("out");
 
 /* ---------- camera scanning ---------- */
 let scanner=null, scanning=false;
-function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.frequency.value=1200;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.12)}catch(_){}
+let actx=null;
+function unlockSound(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==="suspended")actx.resume();const o=actx.createOscillator(),g=actx.createGain();g.gain.value=0;o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+.01)}catch(_){}}
+function beep(){try{const a=actx||new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.frequency.value=1200;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.12)}catch(_){}
   if(navigator.vibrate)navigator.vibrate(80)}
 async function startCam(){
   if(scanning)return;
+  unlockSound();
   if(!window.Html5Qrcode){showMsg("The scanner didn't load. Check your internet and reload the page.","err");return}
   $("action").hidden=true;$("reader").hidden=false;$("camStop").hidden=false;$("camBtn").hidden=true;
   const F=Html5QrcodeSupportedFormats;
@@ -251,7 +254,7 @@ async function startCam(){
   try{
     scanning=true;
     await scanner.start({facingMode:"environment"},{fps:12,qrbox:(w,h)=>({width:Math.min(w*0.85,340),height:Math.min(h*0.5,160)})},code=>{
-      if(!scanning)return;beep();stopCam();handleCode(code)},()=>{});
+      if(!scanning)return;beep();stopCam();showMsg("Got it: "+code,"ok");handleCode(code)},()=>{});
   }catch(e){scanning=false;stopCam();
     showMsg(/Permission|NotAllowed/i.test(String(e))?"The camera was blocked. Allow camera access for this site in your browser settings, then try again.":"Couldn't start the camera. You can type the numbers under the barcode instead.","err")}
 }
