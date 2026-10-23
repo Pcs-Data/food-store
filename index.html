@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#2E6A4E">
+<title>Food Store</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#EEF2EF; --surface:#FFFFFF; --ink:#1C2722; --muted:#5A6760; --line:#D3DBD6;
+  --accent:#2E6A4E; --accent-ink:#FFFFFF; --out:#A65A14; --out-soft:#F7E9DA;
+  --good:#2E7D4F; --good-soft:#DFF0E5; --warn:#8A5A00; --warn-soft:#F6ECCF; --bad:#B23A32; --bad-soft:#F6DEDB;
+  --in-soft:#DCEDE3; --shadow:0 1px 2px rgba(20,40,30,.08),0 6px 20px rgba(20,40,30,.06);
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121916; --surface:#1B2420; --ink:#E4ECE7; --muted:#9AA9A1; --line:#2E3A34;
+  --accent:#5DBB8B; --accent-ink:#0E1A14; --out:#E39A55; --out-soft:#3A2A1B;
+  --good:#6CCB95; --good-soft:#1E3A2B; --warn:#E3B54F; --warn-soft:#3A311A; --bad:#EE7D74; --bad-soft:#40211F;
+  --in-soft:#1E3A2B; --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+[hidden]{display:none!important}
+.wrap{max-width:860px;margin:0 auto;padding-block:max(20px,env(safe-area-inset-top,0px)) 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-weight:700;font-size:2.4rem;line-height:1;margin:0;letter-spacing:.01em;text-transform:uppercase}
+h2{margin:0;font-family:var(--f-display);font-size:1.6rem;line-height:1.1}
+.sub{color:var(--muted);margin:4px 0 0;font-size:.95rem}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 14px;font-weight:700;min-height:44px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.outbtn{background:var(--out);border-color:var(--out);color:#fff}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.small{min-height:36px;padding:6px 10px;font-size:.9rem}
+.btn.big{min-height:64px;font-size:1.2rem;width:100%}
+.btn:disabled{opacity:.5;cursor:default}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:12px}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mode{border:2px solid var(--line);background:transparent;border-radius:12px;padding:12px;font-family:var(--f-display);font-size:1.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;min-height:60px}
+.mode[aria-pressed="true"].in{background:var(--in-soft);border-color:var(--accent);color:var(--accent)}
+.mode[aria-pressed="true"].out{background:var(--out-soft);border-color:var(--out);color:var(--out)}
+.mode small{display:block;font-family:var(--f-body);font-size:.8rem;text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted)}
+#reader{width:100%;border-radius:12px;overflow:hidden;background:#000}
+#reader video{width:100%!important;display:block}
+.typerow{display:flex;gap:8px}
+.typerow input{flex:1;min-width:0;border:2px solid var(--line);border-radius:10px;padding:10px 12px;font-family:var(--f-mono);font-size:1rem;background:var(--bg)}
+.hint{color:var(--muted);font-size:.88rem;margin:0}
+.msg{border-radius:10px;padding:10px 12px;font-weight:700}
+.msg.ok{background:var(--good-soft);color:var(--good)}
+.msg.err{background:var(--bad-soft);color:var(--bad)}
+.msg.info{background:var(--warn-soft);color:var(--warn)}
+.action{border:2px solid var(--accent);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--bg)}
+.action.out{border-color:var(--out)}
+.code{font-family:var(--f-mono);font-size:.85rem;color:var(--muted)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted);font-weight:700}
+label.f input,label.f select{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--surface);font-weight:400;color:var(--ink);font-size:1rem;min-height:44px;min-width:0;width:100%}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper button{width:48px;height:48px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:1.4rem;font-weight:700;flex:none}
+label.f .stepper input{width:76px;text-align:center;font-family:var(--f-mono)}
+.bbrow{display:flex;gap:6px}
+.bbrow select{flex:1;min-width:0}
+.actrow{display:flex;gap:8px;flex-wrap:wrap}
+.or{color:var(--muted);font-size:.85rem;text-align:center}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface);text-align:left;font-weight:400}
+.stat b{display:block;font-family:var(--f-display);font-size:2rem;line-height:1}
+.stat span{font-size:.82rem;color:var(--muted)}
+.stat[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.stat.warn b{color:var(--warn)} .stat.bad b{color:var(--bad)} .stat.buy b{color:var(--out)}
+@media (max-width:560px){.stats{grid-template-columns:1fr 1fr}}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.toolbar input{flex:1 1 200px;min-width:0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.shelf{display:flex;flex-direction:column;gap:6px}
+.shelf h3,.label{margin:8px 0 2px;font-family:var(--f-display);font-size:1.15rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;width:100%}
+.row:hover{border-color:var(--muted)}
+.row .nm{font-weight:700;min-width:0}
+.row .meta{grid-column:1;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:.82rem;color:var(--muted)}
+.row .qty{grid-row:1/3;grid-column:2;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.qty b{font-size:1.3rem;display:block;line-height:1.1}
+.qty span{font-size:.75rem;color:var(--muted)}
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:.75rem;font-weight:700;white-space:nowrap}
+.chip.Good{background:var(--good-soft);color:var(--good)}
+.chip.Sometimes,.chip.soon{background:var(--warn-soft);color:var(--warn)}
+.chip.Avoid,.chip.expired{background:var(--bad-soft);color:var(--bad)}
+.chip.buy{background:var(--out-soft);color:var(--out)}
+.chip.code{background:var(--bg);color:var(--muted);font-family:var(--f-mono);font-weight:500}
+.empty{border:2px dashed var(--line);border-radius:12px;padding:24px;text-align:center;color:var(--muted)}
+.recent{font-size:.88rem;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.recent div{display:flex;gap:8px}
+.recent .d{font-family:var(--f-mono);font-size:.8rem;min-width:96px}
+.In{color:var(--accent);font-weight:700}.Out{color:var(--out);font-weight:700}
+.sheet{position:fixed;inset:0;background:rgba(10,20,15,.5);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.sheet .panel{background:var(--surface);width:100%;max-width:620px;max-height:92%;overflow:auto;border-radius:16px 16px 0 0;padding:18px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+@media (min-width:700px){.sheet{align-items:center}.sheet .panel{border-radius:16px}}
+.batch{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:8px}
+.batch .bbrow{flex:1 1 200px}
+.busy{position:fixed;top:max(10px,env(safe-area-inset-top,0px));right:max(10px,env(safe-area-inset-right,0px));background:var(--ink);color:var(--bg);border-radius:999px;padding:6px 14px;font-size:.85rem;font-weight:700;z-index:30}
+footer{color:var(--muted);font-size:.82rem;display:flex;flex-direction:column;gap:6px}
+.linkbtn{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:.82rem;align-self:flex-start}
+</style>
+</head>
+<body>
+<div class="busy" id="busy" hidden>Saving…</div>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Food Store</h1>
+      <p class="sub">Scan food in and out. Oldest best-before goes out first.</p>
+    </div>
+    <button class="btn" id="excelBtn">Download to Excel</button>
+  </header>
+
+  <!-- First-time setup -->
+  <section class="card" id="setupCard" hidden>
+    <h2>Connect to your Google Sheet</h2>
+    <p class="hint">Do this once on each phone or computer. Paste the web app address from Google, and the password you typed into the script.</p>
+    <label class="f">Web app address<input id="setUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+    <label class="f">Password<input id="setKey" type="password" autocomplete="off"></label>
+    <div class="actrow"><button class="btn primary" id="setSave">Connect</button></div>
+    <div id="setMsg" class="msg" hidden></div>
+  </section>
+
+  <div id="main" hidden style="display:flex;flex-direction:column;gap:18px">
+    <section class="card" aria-label="Scan">
+      <div class="modes" role="group" aria-label="In or out">
+        <button class="mode in" id="modeIn" aria-pressed="true">Book in<small>Putting food into the store</small></button>
+        <button class="mode out" id="modeOut" aria-pressed="false">Book out<small>Taking food to use</small></button>
+      </div>
+      <button class="btn primary big" id="camBtn">Scan barcode with camera</button>
+      <div id="reader" hidden></div>
+      <button class="btn" id="camStop" hidden>Stop camera</button>
+      <div class="typerow">
+        <input id="typeCode" inputmode="numeric" autocomplete="off" placeholder="…or type the numbers under the barcode" aria-label="Barcode number">
+        <button class="btn" id="typeGo">Go</button>
+      </div>
+      <div id="msg" class="msg" hidden></div>
+      <div id="action" hidden></div>
+    </section>
+
+    <section class="stats" aria-label="Summary">
+      <button class="stat" data-f="all" aria-pressed="true"><b id="nAll">0</b><span>Items in store</span></button>
+      <button class="stat buy" data-f="buy" aria-pressed="false"><b id="nBuy">0</b><span>On shopping list</span></button>
+      <button class="stat warn" data-f="soon" aria-pressed="false"><b id="nSoon">0</b><span>Use within 2 months</span></button>
+      <button class="stat bad" data-f="expired" aria-pressed="false"><b id="nExp">0</b><span>Past best-before</span></button>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:10px" aria-label="Stock">
+      <div class="toolbar">
+        <input id="search" placeholder="Search the store" aria-label="Search">
+        <button class="btn" id="addBtn">Add item</button>
+        <button class="btn" id="refreshBtn">Refresh</button>
+      </div>
+      <div id="list"><div class="empty">Loading your store…</div></div>
+    </section>
+
+    <section aria-label="Recent">
+      <div class="label">Recent movements</div>
+      <div class="recent" id="recent"><div>Nothing booked in or out yet.</div></div>
+    </section>
+
+    <footer>
+      <div>Gout guide: <span class="chip Good">Good</span> low purine · <span class="chip Sometimes">Sometimes</span> moderate · <span class="chip Avoid">Avoid</span> high purine. New items get a rating guessed from the name, so check it. Tap any item to change it.</div>
+      <div>Product names come from Open Food Facts, a free food database.</div>
+      <button class="linkbtn" id="disconnect">Change Google Sheet connection on this device</button>
+    </footer>
+  </div>
+</div>
+
+<div id="sheet" class="sheet" hidden></div>
+
+<script>
+const SHELVES=["Rice, pasta & grains","Dairy","Tinned fruit & veg","Protein","Drinks & water","Other"];
+const GOUT=["Good","Sometimes","Avoid"];
+const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const now=new Date(), curYM=now.getFullYear()*12+now.getMonth();
+let cfg={url:"",key:""}, items=[], log=[], mode="in", filter="all", lastBB={};
+
+/* ---------- saved settings on this device ---------- */
+function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(_){return d}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(_){}}
+cfg=load("foodstore.cfg",cfg); lastBB=load("foodstore.lastbb",{});
+
+/* ---------- talking to the Google Sheet ---------- */
+let pending=0;
+async function api(action,data={}){
+  pending++;$("busy").hidden=false;$("busy").textContent=action==="list"?"Loading…":"Saving…";
+  try{
+    const r=await fetch(cfg.url,{method:"POST",body:JSON.stringify({key:cfg.key,action,...data})});
+    const j=await r.json();
+    if(!j.ok)throw new Error(j.error||"Something went wrong");
+    if(j.data){items=j.data.items;log=j.data.log;render()}
+    return j;
+  }finally{pending--;if(!pending)$("busy").hidden=true}
+}
+function niceErr(e){const m=String(e&&e.message||e);
+  if(/Wrong password/.test(m))return"The password doesn't match the one in the Google script.";
+  if(/Failed to fetch|NetworkError|Load failed|JSON/i.test(m))return"Couldn't reach the Google Sheet. Check your internet connection, and that the web app address is right.";
+  return m}
+
+/* ---------- setup screen ---------- */
+function showSetup(){$("setupCard").hidden=false;$("main").hidden=true;$("setUrl").value=cfg.url;$("setKey").value=cfg.key}
+$("setSave").onclick=async()=>{
+  const url=$("setUrl").value.trim(),key=$("setKey").value;
+  const m=$("setMsg");
+  if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(url)){m.className="msg err";m.textContent="That doesn't look like the web app address. It starts with https://script.google.com and ends with /exec.";m.hidden=false;return}
+  cfg={url,key};
+  try{await api("list");save("foodstore.cfg",cfg);$("setupCard").hidden=true;$("main").hidden=false}
+  catch(e){m.className="msg err";m.textContent=niceErr(e);m.hidden=false}
+};
+$("disconnect").onclick=showSetup;
+
+/* ---------- messages ---------- */
+function showMsg(t,kind){const m=$("msg");m.textContent=t;m.className="msg "+kind;m.hidden=false;clearTimeout(showMsg.t);showMsg.t=setTimeout(()=>m.hidden=true,7000)}
+
+/* ---------- in / out ---------- */
+function setMode(m){mode=m;$("modeIn").setAttribute("aria-pressed",m==="in");$("modeOut").setAttribute("aria-pressed",m==="out");$("action").hidden=true}
+$("modeIn").onclick=()=>setMode("in");$("modeOut").onclick=()=>setMode("out");
+
+/* ---------- camera scanning ---------- */
+let scanner=null, scanning=false;
+function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)();const o=a.createOscillator(),g=a.createGain();o.frequency.value=1200;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.12)}catch(_){}
+  if(navigator.vibrate)navigator.vibrate(80)}
+async function startCam(){
+  if(scanning)return;
+  if(!window.Html5Qrcode){showMsg("The scanner didn't load. Check your internet and reload the page.","err");return}
+  $("action").hidden=true;$("reader").hidden=false;$("camStop").hidden=false;$("camBtn").hidden=true;
+  const F=Html5QrcodeSupportedFormats;
+  scanner=scanner||new Html5Qrcode("reader",{formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.ITF,F.QR_CODE],verbose:false});
+  try{
+    scanning=true;
+    await scanner.start({facingMode:"environment"},{fps:12,qrbox:(w,h)=>({width:Math.min(w*0.85,340),height:Math.min(h*0.5,160)})},code=>{
+      if(!scanning)return;beep();stopCam();handleCode(code)},()=>{});
+  }catch(e){scanning=false;stopCam();
+    showMsg(/Permission|NotAllowed/i.test(String(e))?"The camera was blocked. Allow camera access for this site in your browser settings, then try again.":"Couldn't start the camera. You can type the numbers under the barcode instead.","err")}
+}
+async function stopCam(){
+  scanning=false;$("reader").hidden=true;$("camStop").hidden=true;$("camBtn").hidden=false;
+  try{if(scanner&&scanner.isScanning)await scanner.stop()}catch(_){}
+}
+$("camBtn").onclick=startCam;$("camStop").onclick=stopCam;
+$("typeGo").onclick=()=>{const c=cleanCode($("typeCode").value);if(c){$("typeCode").value="";handleCode(c)}};
+$("typeCode").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("typeGo").click()}});
+function cleanCode(s){return String(s||"").replace(/[^0-9A-Za-z-]/g,"")}
+
+/* ---------- handling a scanned code ---------- */
+const total=it=>(it.batches||[]).reduce((a,b)=>a+(+b.qty||0),0);
+function handleCode(code){
+  code=cleanCode(code);if(!code)return;
+  const it=items.find(x=>(x.barcodes||[]).includes(code));
+  if(it)showBook(it.id,code);else showNew(code);
+}
+
+function bbSelects(pref,val){
+  const[y,m]=val?val.split("-"):["",""];const yr=now.getFullYear();
+  let ms=`<option value="">Month</option>`+MONTHS.map((n,i)=>{const v=String(i+1).padStart(2,"0");return`<option value="${v}" ${m===v?"selected":""}>${n}</option>`}).join("");
+  let ys=`<option value="">Year</option>`;for(let i=yr-1;i<=yr+10;i++)ys+=`<option ${String(i)===y?"selected":""}>${i}</option>`;
+  return `<div class="bbrow"><select id="${pref}M" aria-label="Best-before month">${ms}</select><select id="${pref}Y" aria-label="Best-before year">${ys}</select></div>`;
+}
+function readBB(pref){const m=$(pref+"M").value,y=$(pref+"Y").value;return m&&y?`${y}-${m}`:""}
+function stepper(id,v,min=1){return `<div class="stepper"><button type="button" data-step="${id}" data-d="-1" data-min="${min}" aria-label="One less">−</button><input id="${id}" type="number" min="${min}" value="${v}" inputmode="numeric"><button type="button" data-step="${id}" data-d="1" data-min="${min}" aria-label="One more">+</button></div>`}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;const i=$(b.dataset.step);i.value=Math.max(+b.dataset.min,(+i.value||0)+(+b.dataset.d))});
+const fmtBB=bb=>{if(!bb)return"no date";const[y,m]=bb.split("-");return MONTHS[+m-1]+" "+y};
+
+function showBook(id,code){
+  const it=items.find(x=>x.id===id);if(!it)return;
+  const a=$("action"),have=total(it);
+  a.className="action"+(mode==="out"?" out":"");
+  if(mode==="in"){
+    a.innerHTML=`<div><h2>${esc(it.name)}</h2><div class="code">${esc(code||"")}${code?" · ":""}${have} in store now</div></div>
+      <div class="fields"><label class="f">How many${it.unit?` (${esc(it.unit)})`:""}${stepper("bq",1)}</label>
+      <label class="f">Best-before date${bbSelects("bb",lastBB[id]||"")}</label></div>
+      <div class="actrow"><button class="btn primary" id="doIt">Book in</button><button class="btn" id="cancelA">Cancel</button></div>`;
+    $("doIt").onclick=()=>doBook("bookIn",it,{qty:Math.max(1,+$("bq").value||1),bb:readBB("bb")});
+  }else{
+    const oldest=(it.batches||[]).find(b=>b.qty>0);
+    a.innerHTML=`<div><h2>${esc(it.name)}</h2><div class="code">${esc(code||"")}${code?" · ":""}${have} in store${oldest?` · oldest ${fmtBB(oldest.bb)}`:""}</div></div>
+      ${have?`<div class="fields"><label class="f">How many to take${stepper("bq",1)}</label></div>
+      <div class="actrow"><button class="btn outbtn" id="doIt">Book out</button><button class="btn" id="cancelA">Cancel</button></div>`
+      :`<div class="msg info">None of these are in the store. Tap “Book in” at the top if you're adding some.</div><div class="actrow"><button class="btn" id="cancelA">Close</button></div>`}`;
+    if(have)$("doIt").onclick=()=>doBook("bookOut",it,{qty:Math.min(have,Math.max(1,+$("bq").value||1))});
+  }
+  a.hidden=false;$("cancelA").onclick=()=>a.hidden=true;
+  a.scrollIntoView({block:"nearest",behavior:"smooth"});
+}
+async function doBook(action,it,d){
+  $("doIt").disabled=true;
+  try{
+    await api(action,{id:it.id,...d});
+    if(action==="bookIn"){lastBB[it.id]=d.bb;save("foodstore.lastbb",lastBB)}
+    $("action").hidden=true;
+    const now2=items.find(x=>x.id===it.id),left=now2?total(now2):0;
+    showMsg(action==="bookIn"?`Booked in ${d.qty} × ${it.name}${d.bb?` (best before ${fmtBB(d.bb)})`:""}. ${left} in store.`
+      :`Booked out ${d.qty} × ${it.name}. ${left} left${now2&&now2.keep&&left<now2.keep?", so it's on the shopping list":""}.`,"ok");
+  }catch(e){$("doIt").disabled=false;showMsg(niceErr(e),"err")}
+}
+
+/* guess a gout rating from the product name - only a starting point */
+function guessGout(name){
+  const n=name.toLowerCase();
+  if(/sardine|anchov|mackerel|herring|pilchard|sprat|whitebait|yeast extract|marmite|bovril|liver|kidney|p[aâ]t[eé]|offal|game|venison|beer|lager|ale\b|stout|mussel|scallop|trout|haddock|cod roe/.test(n))return"Avoid";
+  if(/tuna|salmon|chicken|turkey|beef|ham|pork|lamb|bacon|sausage|corned|spam|meat|prawn|shrimp|crab|lentil|bean|chickpea|pea\b|peas|spinach|mushroom|asparagus|cauliflower|stock|gravy|soup|oyster|fizzy|cola|juice/.test(n))return"Sometimes";
+  return"Good";
+}
+function guessShelf(name){
+  const n=name.toLowerCase();
+  if(/rice|pasta|spaghetti|noodle|oat|porridge|flour|couscous|cracker|biscuit|bread|cereal|mash|crispbread/.test(n))return SHELVES[0];
+  if(/milk|cheese|yoghurt|yogurt|cream|custard|butter/.test(n))return SHELVES[1];
+  if(/water|coffee|tea\b|squash|juice|drink|cola/.test(n))return SHELVES[4];
+  if(/chicken|tuna|salmon|beef|ham|meat|bean|lentil|chickpea|egg|peanut|nut|sardine|mackerel|corned|spam|sausage/.test(n))return SHELVES[3];
+  if(/tomato|corn|carrot|potato|pea|peach|pear|cherr|pineapple|fruit|veg|apricot|mandarin/.test(n))return SHELVES[2];
+  return SHELVES[5];
+}
+async function lookup(code){
+  try{
+    const ctl=new AbortController();setTimeout(()=>ctl.abort(),6000);
+    const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_en,brands,quantity`,{signal:ctl.signal});
+    const j=await r.json();if(j.status!==1||!j.product)return null;
+    const p=j.product,name=(p.product_name_en||p.product_name||"").trim(),brand=(p.brands||"").split(",")[0].trim();
+    if(!name)return null;
+    return{name:brand&&!name.toLowerCase().includes(brand.toLowerCase())?`${brand} ${name}`:name,unit:(p.quantity||"").trim()};
+  }catch(_){return null}
+}
+function shelfOpts(sel){return SHELVES.map(c=>`<option ${c===sel?"selected":""}>${c}</option>`).join("")}
+function goutOpts(sel){return GOUT.map(g=>`<option ${g===sel?"selected":""}>${g}</option>`).join("")}
+
+async function showNew(code){
+  const a=$("action");a.className="action";
+  a.innerHTML=`<div><h2>New barcode</h2><div class="code">${esc(code)}</div></div><div class="hint">Looking up the product…</div>`;
+  a.hidden=false;
+  const found=await lookup(code);
+  const opts=[...items].sort((x,y)=>x.name.localeCompare(y.name)).map(it=>`<option value="${esc(it.id)}">${esc(it.name)}${it.unit?` (${esc(it.unit)})`:""}</option>`).join("");
+  const nm=found?found.name:"";
+  a.innerHTML=`<div><h2>New barcode</h2><div class="code">${esc(code)}</div></div>
+    ${found?`<div class="msg ok">Found: ${esc(found.name)}${found.unit?`, ${esc(found.unit)}`:""}</div>`:`<div class="hint">Not found in the food database, so type a name below.</div>`}
+    <label class="f">Add it to one of my items<select id="linkSel"><option value="">Choose an item…</option>${opts}</select></label>
+    <div class="actrow"><button class="btn primary" id="doLink">Use this item</button></div>
+    <div class="or">or save it as a new item</div>
+    <div class="fields">
+      <label class="f">Name<input id="nName" value="${esc(nm)}" placeholder="e.g. Chopped tomatoes"></label>
+      <label class="f">Size<input id="nUnit" value="${esc(found?found.unit:"")}" placeholder="e.g. 400g tin"></label>
+      <label class="f">Shelf<select id="nShelf">${shelfOpts(guessShelf(nm))}</select></label>
+      <label class="f">Gout rating (guess, check it)<select id="nGout">${goutOpts(guessGout(nm))}</select></label>
+      <label class="f">Keep in stock<input id="nKeep" type="number" min="0" value="6" inputmode="numeric"></label>
+    </div>
+    <div class="actrow"><button class="btn primary" id="doNew">Save new item</button><button class="btn" id="cancelA">Cancel</button></div>`;
+  $("nName").addEventListener("change",()=>{const n=$("nName").value;$("nGout").innerHTML=goutOpts(guessGout(n));$("nShelf").innerHTML=shelfOpts(guessShelf(n))});
+  $("cancelA").onclick=()=>a.hidden=true;
+  $("doLink").onclick=async()=>{const id=$("linkSel").value;if(!id)return showMsg("Pick an item from the list first.","err");
+    try{await api("addBarcode",{id,code});showBook(id,code)}catch(e){showMsg(niceErr(e),"err")}};
+  $("doNew").onclick=async()=>{const name=$("nName").value.trim();if(!name){$("nName").focus();return showMsg("Give the item a name first.","err")}
+    $("doNew").disabled=true;
+    try{const r=await api("saveItem",{item:{name,unit:$("nUnit").value.trim(),shelf:$("nShelf").value,gout:$("nGout").value,keep:+$("nKeep").value||0,barcodes:[code]}});showBook(r.id,code)}
+    catch(e){$("doNew").disabled=false;showMsg(niceErr(e),"err")}};
+}
+
+/* ---------- list ---------- */
+function earliest(it){const d=(it.batches||[]).filter(b=>b.qty>0&&b.bb).map(b=>b.bb).sort();return d[0]||null}
+function dateState(it){const e=earliest(it);if(!e)return null;const[y,m]=e.split("-").map(Number);const n=y*12+m-1;if(n<curYM)return"expired";if(n<=curYM+2)return"soon";return null}
+function render(){
+  let nAll=0,nBuy=0,nSoon=0,nExp=0;
+  for(const it of items){const t=total(it);nAll+=t;if(it.keep&&t<it.keep)nBuy++;const s=dateState(it);if(s==="soon")nSoon++;if(s==="expired")nExp++}
+  $("nAll").textContent=nAll;$("nBuy").textContent=nBuy;$("nSoon").textContent=nSoon;$("nExp").textContent=nExp;
+  const term=$("search").value.trim().toLowerCase();
+  const list=items.filter(it=>{
+    if(term&&!(it.name.toLowerCase().includes(term)||(it.barcodes||[]).some(b=>b.includes(term))))return false;
+    const t=total(it);
+    if(filter==="buy")return it.keep&&t<it.keep;
+    if(filter==="soon")return dateState(it)==="soon";
+    if(filter==="expired")return dateState(it)==="expired";
+    return true});
+  const el=$("list");
+  if(!items.length){el.innerHTML=`<div class="empty">Your store is empty. Scan a barcode above, or tap “Add item”.</div>`}
+  else if(!list.length){el.innerHTML=`<div class="empty">${filter==="buy"?"Nothing to buy. Every item is at or above its target.":filter==="soon"?"Nothing needs using in the next 2 months.":filter==="expired"?"Nothing is past its best-before date.":"No items match that search."}</div>`}
+  else{
+    const groups={};for(const it of list){const c=SHELVES.includes(it.shelf)?it.shelf:"Other";(groups[c]=groups[c]||[]).push(it)}
+    el.innerHTML=SHELVES.filter(c=>groups[c]).map(c=>`<div class="shelf"><h3>${c}</h3>${groups[c].sort((a,b)=>a.name.localeCompare(b.name)).map(it=>{
+      const t=total(it),need=it.keep?Math.max(0,it.keep-t):0,ds=dateState(it),e=earliest(it);
+      return `<button class="row" data-id="${esc(it.id)}"><span class="nm">${esc(it.name)}</span>
+        <span class="qty"><b>${t}</b><span>${it.keep?`of ${it.keep}`:"in store"}</span></span>
+        <span class="meta"><span class="chip ${esc(it.gout)}">${esc(it.gout)}</span>${it.unit?`<span>${esc(it.unit)}</span>`:""}
+        ${need?`<span class="chip buy">Buy ${need}</span>`:""}${ds==="expired"?`<span class="chip expired">Past date ${fmtBB(e)}</span>`:ds==="soon"?`<span class="chip soon">Use by ${fmtBB(e)}</span>`:e?`<span>BB ${fmtBB(e)}</span>`:""}
+        ${(it.barcodes||[]).length?"":`<span class="chip code">no barcode yet</span>`}</span></button>`}).join("")}</div>`).join("");
+  }
+  const r=$("recent");
+  r.innerHTML=log.length?log.slice(0,8).map(x=>`<div><span class="d">${esc(x.when)}</span><span class="${esc(x.dir)}">${esc(x.dir)} ${esc(x.qty)}</span><span>${esc(x.name)}</span></div>`).join(""):"<div>Nothing booked in or out yet.</div>";
+}
+$("search").addEventListener("input",render);
+document.querySelectorAll(".stat").forEach(b=>b.onclick=()=>{filter=b.dataset.f;document.querySelectorAll(".stat").forEach(x=>x.setAttribute("aria-pressed",x===b));render()});
+$("list").addEventListener("click",e=>{const r=e.target.closest(".row");if(r)openEdit(r.dataset.id)});
+$("addBtn").onclick=()=>openEdit(null);
+$("refreshBtn").onclick=()=>api("list").catch(e=>showMsg(niceErr(e),"err"));
+
+/* ---------- edit an item ---------- */
+let editB=[];
+function openEdit(id){
+  const it=id?items.find(x=>x.id===id):{name:"",unit:"",shelf:SHELVES[0],gout:"Good",keep:6,barcodes:[],batches:[]};
+  if(!it)return;
+  editB=(it.batches||[]).map(b=>({...b}));
+  let codes=[...(it.barcodes||[])];
+  const s=$("sheet");
+  s.innerHTML=`<div class="panel" role="dialog" aria-modal="true" aria-labelledby="eT">
+    <h2 id="eT">${id?"Change item":"Add item"}</h2>
+    <div class="fields">
+      <label class="f">Name<input id="eName" value="${esc(it.name)}"></label>
+      <label class="f">Size<input id="eUnit" value="${esc(it.unit||"")}"></label>
+      <label class="f">Shelf<select id="eShelf">${shelfOpts(it.shelf)}</select></label>
+      <label class="f">Gout rating<select id="eGout">${goutOpts(it.gout)}</select></label>
+      <label class="f">Keep in stock<input id="eKeep" type="number" min="0" value="${+it.keep||0}" inputmode="numeric"></label>
+    </div>
+    <div><strong>How many, by best-before date</strong><div id="eBatches" style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
+      <button class="btn small" id="eAddB" style="margin-top:6px">Add a date</button></div>
+    <div><strong>Barcodes</strong><div id="eCodes" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div></div>
+    <div class="actrow"><button class="btn primary" id="eSave">Save</button><button class="btn" id="eCancel">Cancel</button>${id?`<span style="flex:1"></span><button class="btn danger" id="eDel">Delete item</button>`:""}</div>
+    <div id="eConfirm" class="msg err" hidden>Delete ${esc(it.name)} and all its stock? <button class="btn danger small" id="eDelYes">Yes, delete</button></div>
+  </div>`;
+  s.hidden=false;
+  const drawCodes=()=>{$("eCodes").innerHTML=codes.map((c,i)=>`<span class="chip code">${esc(c)} <button class="btn small" data-rmc="${i}" aria-label="Remove barcode" style="min-height:0;padding:0 6px;border:0;background:transparent">×</button></span>`).join("")||`<span class="hint">None yet. Scan one with “Book in” and choose this item.</span>`};
+  const drawB=()=>{$("eBatches").innerHTML=editB.map((b,i)=>`<div class="batch">${bbSelects("eb"+i,b.bb)}${stepper("eq"+i,b.qty,0)}<button class="btn small" data-rmb="${i}">Remove</button></div>`).join("")||`<span class="hint">None in store.</span>`};
+  const sync=()=>{editB=editB.map((b,i)=>({bb:readBB("eb"+i),qty:Math.max(0,+$("eq"+i).value||0)}))};
+  drawB();drawCodes();
+  s.querySelector(".panel").addEventListener("click",e=>{
+    const rb=e.target.closest("[data-rmb]"),rc=e.target.closest("[data-rmc]");
+    if(rb){sync();editB.splice(+rb.dataset.rmb,1);drawB()}
+    if(rc){codes.splice(+rc.dataset.rmc,1);drawCodes()}
+  });
+  $("eAddB").onclick=()=>{sync();editB.push({bb:"",qty:1});drawB()};
+  $("eCancel").onclick=closeEdit;
+  s.onclick=e=>{if(e.target===s)closeEdit()};
+  $("eSave").onclick=async()=>{
+    sync();const name=$("eName").value.trim();if(!name){$("eName").focus();return}
+    $("eSave").disabled=true;
+    try{
+      const r=await api("saveItem",{item:{id:id||"",name,unit:$("eUnit").value.trim(),shelf:$("eShelf").value,gout:$("eGout").value,keep:+$("eKeep").value||0,barcodes:codes}});
+      const before=JSON.stringify((it.batches||[]).map(b=>[b.bb,b.qty])),after=JSON.stringify(editB.filter(b=>b.qty>0).map(b=>[b.bb,b.qty]));
+      if(before!==after)await api("setBatches",{id:r.id,batches:editB});
+      closeEdit();showMsg(`Saved ${name}.`,"ok");
+    }catch(e){$("eSave").disabled=false;showMsg(niceErr(e),"err");closeEdit()}
+  };
+  if(id){
+    $("eDel").onclick=()=>$("eConfirm").hidden=false;
+    $("eDelYes").onclick=async()=>{try{await api("deleteItem",{id});closeEdit();showMsg(`Deleted ${it.name}.`,"ok")}catch(e){closeEdit();showMsg(niceErr(e),"err")}};
+  }
+}
+function closeEdit(){$("sheet").hidden=true;$("sheet").innerHTML=""}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)closeEdit()});
+
+/* ---------- Excel download ---------- */
+$("excelBtn").onclick=()=>{
+  if(!window.XLSX){showMsg("The Excel maker didn't load. Check your internet and reload.","err");return}
+  if(!items.length){showMsg("Nothing to download yet.","info");return}
+  const sorted=[...items].sort((a,b)=>(SHELVES.indexOf(a.shelf)-SHELVES.indexOf(b.shelf))||a.name.localeCompare(b.name));
+  const stock=sorted.map(it=>{const t=total(it),e=earliest(it);return{"Item":it.name,"Size":it.unit,"Shelf":it.shelf,"Gout rating":it.gout,"In store":t,"Keep in stock":it.keep,"To buy":Math.max(0,it.keep-t),"Earliest best-before":e?fmtBB(e):"","Barcodes":(it.barcodes||[]).join(" ")}});
+  const dates=[];sorted.forEach(it=>(it.batches||[]).forEach(b=>dates.push({"Item":it.name,"Best-before":fmtBB(b.bb),"How many":b.qty})));
+  const shop=sorted.filter(it=>it.keep>total(it)).map(it=>({"Item":it.name,"Size":it.unit,"Buy":it.keep-total(it),"Gout rating":it.gout,"Got it":""}));
+  const wb=XLSX.utils.book_new();
+  const add=(rows,name,w)=>{const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"":"Nothing here"}]);ws["!cols"]=w.map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,ws,name)};
+  add(stock,"Stock",[34,14,22,12,9,13,8,20,30]);
+  add(shop,"Shopping list",[34,14,6,12,8]);
+  add(dates,"By best-before",[34,14,10]);
+  XLSX.writeFile(wb,`Food store ${now.toISOString().slice(0,10)}.xlsx`);
+};
+
+/* ---------- start ---------- */
+(async()=>{
+  if(!cfg.url){showSetup();return}
+  $("main").hidden=false;
+  try{await api("list")}catch(e){$("list").innerHTML=`<div class="empty">${esc(niceErr(e))}</div>`}
+})();
+</script>
+</body>
+</html>
