@@ -126,12 +126,13 @@ footer{color:var(--muted);font-size:.82rem;display:flex;flex-direction:column;ga
 
   <!-- First-time setup -->
   <section class="card" id="setupCard" hidden>
-    <h2>Connect to your Google Sheet</h2>
-    <p class="hint">Do this once on each phone or computer. Paste the web app address from Google, and the password you typed into the script.</p>
-    <label class="f">Web app address<input id="setUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
-    <label class="f">Password<input id="setKey" type="password" autocomplete="off"></label>
+    <h2>Enter your password</h2>
+    <p class="hint">You only need to do this once on each phone or computer. Use the password you typed into the Google script.</p>
+    <label class="f">Password<input id="setKey" type="password" autocomplete="current-password"></label>
+    <label class="f" id="urlBox" hidden>Web app address<input id="setUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
     <div class="actrow"><button class="btn primary" id="setSave">Connect</button></div>
     <div id="setMsg" class="msg" hidden></div>
+    <button class="linkbtn" id="advLink">Use a different Google Sheet</button>
   </section>
 
   <div id="main" hidden style="display:flex;flex-direction:column;gap:18px">
@@ -175,7 +176,7 @@ footer{color:var(--muted);font-size:.82rem;display:flex;flex-direction:column;ga
     <footer>
       <div>Gout guide: <span class="chip Good">Good</span> low purine · <span class="chip Sometimes">Sometimes</span> moderate · <span class="chip Avoid">Avoid</span> high purine. New items get a rating guessed from the name, so check it. Tap any item to change it.</div>
       <div>Product names come from Open Food Facts, a free food database.</div>
-      <button class="linkbtn" id="disconnect">Change Google Sheet connection on this device</button>
+      <button class="linkbtn" id="disconnect">Change password on this device</button>
     </footer>
   </div>
 </div>
@@ -189,12 +190,14 @@ const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov",
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const now=new Date(), curYM=now.getFullYear()*12+now.getMonth();
-let cfg={url:"",key:""}, items=[], log=[], mode="in", filter="all", lastBB={};
+// Ray's Google Sheet web app address (built in, so only the password is needed)
+const SHEET_URL="https://script.google.com/macros/s/AKfycbwtziV4yiG4cF02BTiucdU7T3icqSiMBwx8vPC6G6ThSklLKZX98GZ-YWS0BwxompfR/exec";
+let cfg={url:SHEET_URL,key:""}, items=[], log=[], mode="in", filter="all", lastBB={};
 
 /* ---------- saved settings on this device ---------- */
 function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(_){return d}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(_){}}
-cfg=load("foodstore.cfg",cfg); lastBB=load("foodstore.lastbb",{});
+cfg=load("foodstore.cfg",cfg); if(!cfg.url)cfg.url=SHEET_URL; lastBB=load("foodstore.lastbb",{});
 
 /* ---------- talking to the Google Sheet ---------- */
 let pending=0;
@@ -214,9 +217,12 @@ function niceErr(e){const m=String(e&&e.message||e);
   return m}
 
 /* ---------- setup screen ---------- */
-function showSetup(){$("setupCard").hidden=false;$("main").hidden=true;$("setUrl").value=cfg.url;$("setKey").value=cfg.key}
+function showSetup(){$("setupCard").hidden=false;$("main").hidden=true;$("setUrl").value=cfg.url||SHEET_URL;$("setKey").value=cfg.key;
+  $("urlBox").hidden=!!SHEET_URL&&!showSetup.adv;$("setKey").focus()}
+$("advLink").onclick=()=>{showSetup.adv=true;$("urlBox").hidden=false};
+$("setKey").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("setSave").click()}});
 $("setSave").onclick=async()=>{
-  const url=$("setUrl").value.trim(),key=$("setKey").value;
+  const url=$("setUrl").value.trim()||SHEET_URL,key=$("setKey").value;
   const m=$("setMsg");
   if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(url)){m.className="msg err";m.textContent="That doesn't look like the web app address. It starts with https://script.google.com and ends with /exec.";m.hidden=false;return}
   cfg={url,key};
@@ -478,7 +484,7 @@ $("excelBtn").onclick=()=>{
 
 /* ---------- start ---------- */
 (async()=>{
-  if(!cfg.url){showSetup();return}
+  if(!cfg.url||!cfg.key){showSetup();return}
   $("main").hidden=false;
   try{await api("list")}catch(e){$("list").innerHTML=`<div class="empty">${esc(niceErr(e))}</div>`}
 })();
