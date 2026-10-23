@@ -96,6 +96,7 @@ label.f .stepper input{width:76px;text-align:center;font-family:var(--f-mono)}
 .chip.Sometimes,.chip.soon{background:var(--warn-soft);color:var(--warn)}
 .chip.Avoid,.chip.expired{background:var(--bad-soft);color:var(--bad)}
 .chip.buy{background:var(--out-soft);color:var(--out)}
+.chip.shop{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
 .chip.code{background:var(--bg);color:var(--muted);font-family:var(--f-mono);font-weight:500}
 .empty{border:2px dashed var(--line);border-radius:12px;padding:24px;text-align:center;color:var(--muted)}
 .recent{font-size:.88rem;color:var(--muted);display:flex;flex-direction:column;gap:2px}
@@ -338,13 +339,42 @@ function guessShelf(name){
 async function lookup(code){
   try{
     const ctl=new AbortController();setTimeout(()=>ctl.abort(),6000);
-    const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_en,brands,quantity`,{signal:ctl.signal});
+    const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_en,brands,quantity,stores`,{signal:ctl.signal});
     const j=await r.json();if(j.status!==1||!j.product)return null;
     const p=j.product,name=(p.product_name_en||p.product_name||"").trim(),brand=(p.brands||"").split(",")[0].trim();
     if(!name)return null;
-    return{name:brand&&!name.toLowerCase().includes(brand.toLowerCase())?`${brand} ${name}`:name,unit:(p.quantity||"").trim()};
+    return{name:brand&&!name.toLowerCase().includes(brand.toLowerCase())?`${brand} ${name}`:name,unit:(p.quantity||"").trim(),shop:detectShop(p.brands||"",name,p.stores||"")};
   }catch(_){return null}
 }
+/* work out which supermarket a product comes from: own-brand labels first, then the shop list */
+const SHOPS=["Tesco","Sainsbury's","Asda","Morrisons","Aldi","Lidl","Co-op","Waitrose","M&S","Iceland","Ocado","Costco","Farmfoods","B&M","Home Bargains","Either"];
+// own-brand names each shop uses on its labels
+const SHOP_BRANDS={
+  "Tesco":/\btesco\b|stockwell|hearty food co|ms molly|grower'?s harvest|creamfields|eastman'?s|h\.? ?w\.? nevill|redmere farms|willow farms|boswell farms|woodside farms|nightingale farms|rosedene farms|suntrail farms|bay fishmongers/,
+  "Sainsbury's":/sainsbury|taste the difference|stamford street|hubbard'?s|\bso organic\b|be good to yourself/,
+  "Asda":/\basda\b|just essentials|extra special|smart price/,
+  "Morrisons":/morrisons|\bsavers\b/,
+  "Aldi":/\baldi\b|specially selected|everyday essentials|cowbelle|brooklea|bramwells|harvest morn|nature'?s pick|ashfield farm|the fishmonger|crestwood|four seasons|corale|snackrite/,
+  "Lidl":/\blidl\b|\bdeluxe\b|milbona|chef select|crownfield|freshona|baresa|combino|solevita|pilos|harvest basket|duc de coeur|mcennedy|birchwood|vemondo|\bbatts\b/,
+  "Co-op":/\bco-?op\b|co-operative|irresistible/,
+  "Waitrose":/waitrose|duchy organic/,
+  "M&S":/marks (&|and) spencer|\bm ?& ?s\b|percy pig/,
+  "Iceland":/\biceland\b/,
+  "Ocado":/\bocado\b/,
+  "Costco":/kirkland|costco/,
+  "Farmfoods":/farmfoods/,
+  "B&M":/\bb ?& ?m\b/,
+  "Home Bargains":/home bargains/
+};
+function matchShops(text){text=text.toLowerCase();return Object.keys(SHOP_BRANDS).filter(s=>SHOP_BRANDS[s].test(text))}
+/* work out which supermarket a product comes from: own-brand labels first, then the shops listed in the food database */
+function detectShop(brands,name,stores){
+  const own=matchShops(brands+" "+name);
+  if(own.length===1)return own[0];
+  if(!own.length&&!brands){const st=matchShops(stores);if(st.length===1)return st[0]}
+  return"Either";
+}
+function shopOpts(sel){return SHOPS.map(s=>`<option value="${s}" ${s===sel?"selected":""}>${s==="Either"?"Any shop":s}</option>`).join("")}
 function shelfOpts(sel){return SHELVES.map(c=>`<option ${c===sel?"selected":""}>${c}</option>`).join("")}
 function goutOpts(sel){return GOUT.map(g=>`<option ${g===sel?"selected":""}>${g}</option>`).join("")}
 
@@ -366,6 +396,7 @@ async function showNew(code){
       <label class="f">Shelf<select id="nShelf">${shelfOpts(guessShelf(nm))}</select></label>
       <label class="f">Gout rating (guess, check it)<select id="nGout">${goutOpts(guessGout(nm))}</select></label>
       <label class="f">Keep in stock<input id="nKeep" type="number" min="0" value="6" inputmode="numeric"></label>
+      <label class="f">Shop${found&&found.shop!=="Either"?" (from the label)":""}<select id="nShop">${shopOpts(found?found.shop:"Either")}</select></label>
     </div>
     <div class="actrow"><button class="btn primary" id="doNew">Save new item</button><button class="btn" id="cancelA">Cancel</button></div>`;
   $("nName").addEventListener("change",()=>{const n=$("nName").value;$("nGout").innerHTML=goutOpts(guessGout(n));$("nShelf").innerHTML=shelfOpts(guessShelf(n))});
@@ -374,7 +405,7 @@ async function showNew(code){
     try{await api("addBarcode",{id,code});showBook(id,code)}catch(e){showMsg(niceErr(e),"err")}};
   $("doNew").onclick=async()=>{const name=$("nName").value.trim();if(!name){$("nName").focus();return showMsg("Give the item a name first.","err")}
     $("doNew").disabled=true;
-    try{const r=await api("saveItem",{item:{name,unit:$("nUnit").value.trim(),shelf:$("nShelf").value,gout:$("nGout").value,keep:+$("nKeep").value||0,barcodes:[code]}});showBook(r.id,code)}
+    try{const r=await api("saveItem",{item:{name,unit:$("nUnit").value.trim(),shelf:$("nShelf").value,gout:$("nGout").value,keep:+$("nKeep").value||0,shop:$("nShop").value,barcodes:[code]}});showBook(r.id,code)}
     catch(e){$("doNew").disabled=false;showMsg(niceErr(e),"err")}};
 }
 
@@ -397,13 +428,14 @@ function render(){
   if(!items.length){el.innerHTML=`<div class="empty">Your store is empty. Scan a barcode above, or tap “Add item”.</div>`}
   else if(!list.length){el.innerHTML=`<div class="empty">${filter==="buy"?"Nothing to buy. Every item is at or above its target.":filter==="soon"?"Nothing needs using in the next 2 months.":filter==="expired"?"Nothing is past its best-before date.":"No items match that search."}</div>`}
   else{
-    const groups={};for(const it of list){const c=SHELVES.includes(it.shelf)?it.shelf:"Other";(groups[c]=groups[c]||[]).push(it)}
-    el.innerHTML=SHELVES.filter(c=>groups[c]).map(c=>`<div class="shelf"><h3>${c}</h3>${groups[c].sort((a,b)=>a.name.localeCompare(b.name)).map(it=>{
+    const byShop=filter==="buy",heads=byShop?SHOPS:SHELVES,label=c=>byShop?(c==="Either"?"Any shop":c):c;
+    const groups={};for(const it of list){const c=byShop?(SHOPS.includes(it.shop)?it.shop:"Either"):(SHELVES.includes(it.shelf)?it.shelf:"Other");(groups[c]=groups[c]||[]).push(it)}
+    el.innerHTML=heads.filter(c=>groups[c]).map(c=>`<div class="shelf"><h3>${label(c)}</h3>${groups[c].sort((a,b)=>a.name.localeCompare(b.name)).map(it=>{
       const t=total(it),need=it.keep?Math.max(0,it.keep-t):0,ds=dateState(it),e=earliest(it);
       return `<button class="row" data-id="${esc(it.id)}"><span class="nm">${esc(it.name)}</span>
         <span class="qty"><b>${t}</b><span>${it.keep?`of ${it.keep}`:"in store"}</span></span>
         <span class="meta"><span class="chip ${esc(it.gout)}">${esc(it.gout)}</span>${it.unit?`<span>${esc(it.unit)}</span>`:""}
-        ${need?`<span class="chip buy">Buy ${need}</span>`:""}${ds==="expired"?`<span class="chip expired">Past date ${fmtBB(e)}</span>`:ds==="soon"?`<span class="chip soon">Use by ${fmtBB(e)}</span>`:e?`<span>BB ${fmtBB(e)}</span>`:""}
+        ${it.shop&&it.shop!=="Either"?`<span class="chip shop">${esc(it.shop)}</span>`:""}${need?`<span class="chip buy">Buy ${need}</span>`:""}${ds==="expired"?`<span class="chip expired">Past date ${fmtBB(e)}</span>`:ds==="soon"?`<span class="chip soon">Use by ${fmtBB(e)}</span>`:e?`<span>BB ${fmtBB(e)}</span>`:""}
         ${(it.barcodes||[]).length?"":`<span class="chip code">no barcode yet</span>`}</span></button>`}).join("")}</div>`).join("");
   }
   const r=$("recent");
@@ -431,6 +463,7 @@ function openEdit(id){
       <label class="f">Shelf<select id="eShelf">${shelfOpts(it.shelf)}</select></label>
       <label class="f">Gout rating<select id="eGout">${goutOpts(it.gout)}</select></label>
       <label class="f">Keep in stock<input id="eKeep" type="number" min="0" value="${+it.keep||0}" inputmode="numeric"></label>
+      <label class="f">Shop<select id="eShop">${shopOpts(it.shop||"Either")}</select></label>
     </div>
     <div><strong>How many, by best-before date</strong><div id="eBatches" style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
       <button class="btn small" id="eAddB" style="margin-top:6px">Add a date</button></div>
@@ -455,7 +488,7 @@ function openEdit(id){
     sync();const name=$("eName").value.trim();if(!name){$("eName").focus();return}
     $("eSave").disabled=true;
     try{
-      const r=await api("saveItem",{item:{id:id||"",name,unit:$("eUnit").value.trim(),shelf:$("eShelf").value,gout:$("eGout").value,keep:+$("eKeep").value||0,barcodes:codes}});
+      const r=await api("saveItem",{item:{id:id||"",name,unit:$("eUnit").value.trim(),shelf:$("eShelf").value,gout:$("eGout").value,keep:+$("eKeep").value||0,shop:$("eShop").value,barcodes:codes}});
       const before=JSON.stringify((it.batches||[]).map(b=>[b.bb,b.qty])),after=JSON.stringify(editB.filter(b=>b.qty>0).map(b=>[b.bb,b.qty]));
       if(before!==after)await api("setBatches",{id:r.id,batches:editB});
       closeEdit();showMsg(`Saved ${name}.`,"ok");
@@ -474,13 +507,14 @@ $("excelBtn").onclick=()=>{
   if(!window.XLSX){showMsg("The Excel maker didn't load. Check your internet and reload.","err");return}
   if(!items.length){showMsg("Nothing to download yet.","info");return}
   const sorted=[...items].sort((a,b)=>(SHELVES.indexOf(a.shelf)-SHELVES.indexOf(b.shelf))||a.name.localeCompare(b.name));
-  const stock=sorted.map(it=>{const t=total(it),e=earliest(it);return{"Item":it.name,"Size":it.unit,"Shelf":it.shelf,"Gout rating":it.gout,"In store":t,"Keep in stock":it.keep,"To buy":Math.max(0,it.keep-t),"Earliest best-before":e?fmtBB(e):"","Barcodes":(it.barcodes||[]).join(" ")}});
+  const stock=sorted.map(it=>{const t=total(it),e=earliest(it);return{"Item":it.name,"Size":it.unit,"Shelf":it.shelf,"Gout rating":it.gout,"In store":t,"Keep in stock":it.keep,"To buy":Math.max(0,it.keep-t),"Earliest best-before":e?fmtBB(e):"","Shop":!it.shop||it.shop==="Either"?"Any shop":it.shop,"Barcodes":(it.barcodes||[]).join(" ")}});
   const dates=[];sorted.forEach(it=>(it.batches||[]).forEach(b=>dates.push({"Item":it.name,"Best-before":fmtBB(b.bb),"How many":b.qty})));
-  const shop=sorted.filter(it=>it.keep>total(it)).map(it=>({"Item":it.name,"Size":it.unit,"Buy":it.keep-total(it),"Gout rating":it.gout,"Got it":""}));
+  const shopOrder=Object.fromEntries(SHOPS.map((s,i)=>[s,i]));
+  const shop=sorted.filter(it=>it.keep>total(it)).sort((a,b)=>((shopOrder[a.shop]??99)-(shopOrder[b.shop]??99))||a.name.localeCompare(b.name)).map(it=>({"Shop":it.shop==="Either"||!it.shop?"Any shop":it.shop,"Item":it.name,"Size":it.unit,"Buy":it.keep-total(it),"Gout rating":it.gout,"Got it":""}));
   const wb=XLSX.utils.book_new();
   const add=(rows,name,w)=>{const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{"":"Nothing here"}]);ws["!cols"]=w.map(x=>({wch:x}));XLSX.utils.book_append_sheet(wb,ws,name)};
-  add(stock,"Stock",[34,14,22,12,9,13,8,20,30]);
-  add(shop,"Shopping list",[34,14,6,12,8]);
+  add(stock,"Stock",[34,14,22,12,9,13,8,20,12,30]);
+  add(shop,"Shopping list",[14,34,14,6,12,8]);
   add(dates,"By best-before",[34,14,10]);
   XLSX.writeFile(wb,`Food store ${now.toISOString().slice(0,10)}.xlsx`);
 };
